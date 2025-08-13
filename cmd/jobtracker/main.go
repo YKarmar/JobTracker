@@ -6,10 +6,10 @@ import (
 	"log"
 	"time"
 
-	"jobtracker/internal/analyzer"
-	"jobtracker/internal/client"
-	"jobtracker/internal/config"
-	"jobtracker/internal/exporter"
+	"github.com/YKarmar/JobTracker/internal/analyzer"
+	"github.com/YKarmar/JobTracker/internal/client"
+	"github.com/YKarmar/JobTracker/internal/config"
+	"github.com/YKarmar/JobTracker/internal/exporter"
 )
 
 func main() {

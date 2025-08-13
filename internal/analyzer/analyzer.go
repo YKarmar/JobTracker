@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"jobtracker/internal/types"
+	"github.com/YKarmar/JobTracker/internal/types"
 )
 
 // LLM客户端配置
