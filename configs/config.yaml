@@ -1,0 +1,29 @@
+imap:
+  email: ${USER_EMAIL}                    # 从环境变量读取邮箱地址
+  folders:                                # 要抓取的邮箱文件夹
+    - "INBOX"
+    - "[Gmail]/Sent Mail"
+    - "[Gmail]/All Mail"
+
+mcp:
+  endpoint: "http://localhost:8080/mcp"   # MCP服务端点
+  api_key: ""                             # MCP API密钥（可选）
+
+fetch:
+  start: "2025-08-12"                     # 开始日期 YYYY-MM-DD
+  end: "2025-08-13"                       # 结束日期 YYYY-MM-DD
+  max_emails: 100                         # 最大抓取邮件数量
+
+llm:
+  api_base: "https://api.deepseek.com/v1"
+  api_key: ${DEEPSEEK_API_KEY}
+  model: "deepseek-chat"
+  temperature: 0.2
+  max_tokens: 2000
+
+export:
+  file: "job_summary.csv"
+
+
+
+
