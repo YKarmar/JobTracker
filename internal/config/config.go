@@ -61,17 +61,26 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("imap.email is required")
 	}
 
-	// 自动推断 Gmail 配置
-	if cfg.IMAP.Host == "" {
-		if hasSuffixInsensitive(cfg.IMAP.Email, "@gmail.com") || hasSuffixInsensitive(cfg.IMAP.Email, "@googlemail.com") {
-			cfg.IMAP.Host = "imap.gmail.com:993"
-			cfg.IMAP.UseTLS = true
+	// 使用MCP协议时，不需要具体的IMAP配置
+	// 但仍需要推断邮箱提供商类型用于MCP客户端
+	if cfg.IMAP.Provider == "" {
+		cfg.IMAP.Provider = inferEmailProvider(cfg.IMAP.Email)
+	}
+
+	// 只有在未使用MCP协议时才配置传统IMAP设置
+	if cfg.MCP.Endpoint == "" {
+		// 自动推断传统IMAP配置（仅在无MCP时使用）
+		if cfg.IMAP.Host == "" {
+			cfg.IMAP.Host = inferIMAPHost(cfg.IMAP.Email)
+			if cfg.IMAP.Host != "" {
+				cfg.IMAP.UseTLS = true
+			}
 		}
 	}
 
-	// 默认文件夹
+	// 默认文件夹配置根据邮箱提供商调整
 	if len(cfg.IMAP.Folders) == 0 {
-		cfg.IMAP.Folders = []string{"INBOX"}
+		cfg.IMAP.Folders = getDefaultFolders(cfg.IMAP.Provider)
 	}
 
 	// 默认抓取数量
@@ -97,6 +106,56 @@ func expandEnvVars(content string) string {
 		}
 		return match // 如果环境变量不存在，保持原样
 	})
+}
+
+// inferEmailProvider 根据邮箱地址推断提供商
+func inferEmailProvider(email string) string {
+	email = strings.ToLower(email)
+
+	if strings.Contains(email, "@gmail.com") || strings.Contains(email, "@googlemail.com") {
+		return "gmail"
+	}
+	if strings.Contains(email, "@outlook.com") || strings.Contains(email, "@hotmail.com") || strings.Contains(email, "@live.com") {
+		return "outlook"
+	}
+	if strings.Contains(email, "@yahoo.com") || strings.Contains(email, "@yahoo.co.") {
+		return "yahoo"
+	}
+	if strings.Contains(email, "@qq.com") || strings.Contains(email, "@163.com") || strings.Contains(email, "@126.com") {
+		return "chinese"
+	}
+
+	return "custom"
+}
+
+// inferIMAPHost 根据邮箱地址推断IMAP主机（仅在无MCP时使用）
+func inferIMAPHost(email string) string {
+	provider := inferEmailProvider(email)
+
+	switch provider {
+	case "gmail":
+		return "imap.gmail.com:993"
+	case "outlook":
+		return "outlook.office365.com:993"
+	case "yahoo":
+		return "imap.mail.yahoo.com:993"
+	default:
+		return "" // 需要手动配置
+	}
+}
+
+// getDefaultFolders 根据邮箱提供商返回默认文件夹
+func getDefaultFolders(provider string) []string {
+	switch provider {
+	case "gmail":
+		return []string{"INBOX", "[Gmail]/Sent Mail", "[Gmail]/All Mail"}
+	case "outlook":
+		return []string{"INBOX", "Sent Items"}
+	case "yahoo":
+		return []string{"INBOX", "Sent"}
+	default:
+		return []string{"INBOX"}
+	}
 }
 
 func hasSuffixInsensitive(s, suf string) bool {

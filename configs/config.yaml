@@ -1,9 +1,7 @@
 imap:
   email: ${USER_EMAIL}                    # 从环境变量读取邮箱地址
-  folders:                                # 要抓取的邮箱文件夹
-    - "INBOX"
-    - "[Gmail]/Sent Mail"
-    - "[Gmail]/All Mail"
+  provider: ""                            # 邮箱提供商，自动推断（gmail/outlook/yahoo/chinese/custom）
+  folders: []                             # 要抓取的邮箱文件夹，留空则根据提供商自动设置
 
 mcp:
   endpoint: "http://localhost:8080/mcp"   # MCP服务端点

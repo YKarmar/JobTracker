@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"time"
@@ -10,9 +11,14 @@ import (
 	"github.com/YKarmar/JobTracker/internal/client"
 	"github.com/YKarmar/JobTracker/internal/config"
 	"github.com/YKarmar/JobTracker/internal/exporter"
+	"github.com/YKarmar/JobTracker/internal/types"
 )
 
 func main() {
+	// 命令行参数
+	mockMode := flag.Bool("mock", false, "使用模拟数据（用于测试）")
+	flag.Parse()
+
 	fmt.Println("=== JobTracker 求职邮件分析工具 ===")
 	fmt.Println("正在加载配置...")
 
@@ -25,62 +31,70 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
 
-	// 2. 设置MCP邮件客户端
-	mcpConfig := client.MCPEmailConfig{
-		Provider:    client.ProviderGmailMCP,
-		Email:       cfg.IMAP.Email,
-		MCPEndpoint: "http://localhost:8080/mcp", // 默认MCP端点
-	}
+	var emails []types.Email
 
-	// 如果有MCP配置，使用配置的值
-	if cfg.MCP.Endpoint != "" {
-		mcpConfig.MCPEndpoint = cfg.MCP.Endpoint
-	}
-	if cfg.MCP.APIKey != "" {
-		mcpConfig.APIKey = cfg.MCP.APIKey
-	}
-
-	emailClient := client.NewMCPEmailClient(mcpConfig)
-
-	// 3. 触发邮箱登录
-	fmt.Printf("正在为邮箱 %s 启动登录流程...\n", cfg.IMAP.Email)
-
-	session, err := emailClient.InitiateEmailLogin(ctx)
-	if err != nil {
-		log.Fatalf("启动邮箱登录失败: %v", err)
-	}
-
-	if session.LoginURL != "" {
-		fmt.Printf("请在浏览器中完成登录: %s\n", session.LoginURL)
-
-		// 自动打开浏览器
-		if err := openBrowser(session.LoginURL); err != nil {
-			fmt.Printf("无法自动打开浏览器，请手动访问上述链接\n")
+	if *mockMode {
+		fmt.Println("🧪 使用模拟模式进行测试...")
+		emails = generateMockEmails()
+	} else {
+		// 2. 设置MCP邮件客户端
+		mcpConfig := client.MCPEmailConfig{
+			Provider:    client.ParseEmailProvider(cfg.IMAP.Provider),
+			Email:       cfg.IMAP.Email,
+			MCPEndpoint: "http://localhost:8080/mcp", // 默认MCP端点
 		}
 
-		fmt.Println("等待登录完成...")
-		// 这里应该实现等待登录完成的逻辑
-		time.Sleep(30 * time.Second) // 简单等待，实际应该轮询状态
-	}
+		// 如果有MCP配置，使用配置的值
+		if cfg.MCP.Endpoint != "" {
+			mcpConfig.MCPEndpoint = cfg.MCP.Endpoint
+		}
+		if cfg.MCP.APIKey != "" {
+			mcpConfig.APIKey = cfg.MCP.APIKey
+		}
 
-	// 4. 获取邮件
-	start := config.ParseDateLoose(cfg.Fetch.Start, time.Now().AddDate(0, 0, -7))
-	end := config.ParseDateLoose(cfg.Fetch.End, time.Now())
+		emailClient := client.NewMCPEmailClient(mcpConfig)
 
-	query := client.EmailQuery{
-		StartDate: start,
-		EndDate:   end,
-		MaxEmails: cfg.Fetch.MaxEmails,
-		Folders:   cfg.IMAP.Folders,
-		Keywords:  []string{"job", "interview", "offer", "application", "招聘", "面试", "职位", "工作"},
-	}
+		// 3. 触发邮箱登录
+		fmt.Printf("正在为邮箱 %s 启动登录流程...\n", cfg.IMAP.Email)
+		fmt.Printf("检测到邮箱提供商: %s\n", cfg.IMAP.Provider)
 
-	fmt.Printf("正在获取邮件 (时间范围: %s 到 %s)...\n",
-		start.Format("2006-01-02"), end.Format("2006-01-02"))
+		session, err := emailClient.InitiateEmailLogin(ctx)
+		if err != nil {
+			log.Fatalf("启动邮箱登录失败: %v\n提示: 如需测试，可使用 --mock 参数", err)
+		}
 
-	emails, err := emailClient.FetchEmails(ctx, query)
-	if err != nil {
-		log.Fatalf("获取邮件失败: %v", err)
+		if session.LoginURL != "" {
+			fmt.Printf("请在浏览器中完成登录: %s\n", session.LoginURL)
+
+			// 自动打开浏览器
+			if err := openBrowser(session.LoginURL); err != nil {
+				fmt.Printf("无法自动打开浏览器，请手动访问上述链接\n")
+			}
+
+			fmt.Println("等待登录完成...")
+			// 这里应该实现等待登录完成的逻辑
+			time.Sleep(30 * time.Second) // 简单等待，实际应该轮询状态
+		}
+
+		// 4. 获取邮件
+		start := config.ParseDateLoose(cfg.Fetch.Start, time.Now().AddDate(0, 0, -7))
+		end := config.ParseDateLoose(cfg.Fetch.End, time.Now())
+
+		query := client.EmailQuery{
+			StartDate: start,
+			EndDate:   end,
+			MaxEmails: cfg.Fetch.MaxEmails,
+			Folders:   cfg.IMAP.Folders,
+			Keywords:  []string{"job", "interview", "offer", "application", "招聘", "面试", "职位", "工作"},
+		}
+
+		fmt.Printf("正在获取邮件 (时间范围: %s 到 %s)...\n",
+			start.Format("2006-01-02"), end.Format("2006-01-02"))
+
+		emails, err = emailClient.FetchEmails(ctx, query)
+		if err != nil {
+			log.Fatalf("获取邮件失败: %v", err)
+		}
 	}
 
 	fmt.Printf("成功获取 %d 封邮件\n", len(emails))
@@ -154,6 +168,39 @@ func main() {
 		if len(jobApplications) > 5 {
 			fmt.Printf("... 还有 %d 条记录，详情请查看CSV文件\n", len(jobApplications)-5)
 		}
+	}
+}
+
+// 生成测试用的模拟邮件数据
+func generateMockEmails() []types.Email {
+	return []types.Email{
+		{
+			ID:       "1",
+			From:     "noreply@company.com",
+			Subject:  "感谢您投递简历 - 软件工程师职位",
+			Date:     time.Now().AddDate(0, 0, -1),
+			BodyText: "感谢您投递我们公司软件工程师职位的简历。我们已收到您的申请，将在3-5个工作日内回复。",
+			BodyHTML: "<p>感谢您投递我们公司软件工程师职位的简历。我们已收到您的申请，将在3-5个工作日内回复。</p>",
+			Folder:   "INBOX",
+		},
+		{
+			ID:       "2",
+			From:     "hr@techcorp.com",
+			Subject:  "邀请您参加在线技术测试",
+			Date:     time.Now().AddDate(0, 0, -3),
+			BodyText: "恭喜您通过简历筛选！我们邀请您参加在线技术测试，请在48小时内完成。",
+			BodyHTML: "<p>恭喜您通过简历筛选！我们邀请您参加在线技术测试，请在48小时内完成。</p>",
+			Folder:   "INBOX",
+		},
+		{
+			ID:       "3",
+			From:     "recruitment@startup.io",
+			Subject:  "Interview Invitation - Frontend Developer Position",
+			Date:     time.Now().AddDate(0, 0, -5),
+			BodyText: "We would like to invite you for an interview for the Frontend Developer position. Please confirm your availability.",
+			BodyHTML: "<p>We would like to invite you for an interview for the Frontend Developer position. Please confirm your availability.</p>",
+			Folder:   "INBOX",
+		},
 	}
 }
 

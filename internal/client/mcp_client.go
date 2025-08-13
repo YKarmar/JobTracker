@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/YKarmar/JobTracker/internal/types"
@@ -36,10 +37,11 @@ type MCPError struct {
 type EmailProvider string
 
 const (
-	ProviderGmailMCP EmailProvider = "gmail"
-	ProviderOutlook  EmailProvider = "outlook"
-	ProviderYahoo    EmailProvider = "yahoo"
-	ProviderCustom   EmailProvider = "custom"
+	ProviderGmail   EmailProvider = "gmail"
+	ProviderOutlook EmailProvider = "outlook"
+	ProviderYahoo   EmailProvider = "yahoo"
+	ProviderChinese EmailProvider = "chinese" // QQ, 163, 126等国内邮箱
+	ProviderCustom  EmailProvider = "custom"
 )
 
 // MCP邮件客户端配置
@@ -80,6 +82,22 @@ func NewMCPEmailClient(config MCPEmailConfig) *MCPEmailClient {
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+	}
+}
+
+// 根据字符串转换为EmailProvider
+func ParseEmailProvider(provider string) EmailProvider {
+	switch strings.ToLower(provider) {
+	case "gmail":
+		return ProviderGmail
+	case "outlook":
+		return ProviderOutlook
+	case "yahoo":
+		return ProviderYahoo
+	case "chinese":
+		return ProviderChinese
+	default:
+		return ProviderCustom
 	}
 }
 
