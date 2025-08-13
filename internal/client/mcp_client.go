@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"jobtracker/internal/types"
+	"github.com/YKarmar/JobTracker/internal/types"
 )
 
 // MCP协议相关结构体

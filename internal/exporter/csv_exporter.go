@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"jobtracker/internal/types"
+	"github.com/YKarmar/JobTracker/internal/types"
 )
 
 // CSV导出器
